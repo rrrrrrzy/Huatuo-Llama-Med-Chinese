@@ -1,7 +1,7 @@
 import os
 import sys
 from typing import List
-
+import argparse
 import fire
 import wandb
 import torch
@@ -60,7 +60,7 @@ def train(
     train_on_inputs: bool = False,  # if False, masks out inputs in loss
     group_by_length: bool = False,  # faster, but produces an odd training loss curve
     # wandb params
-    wandb_project: str = "llama_med",
+    wandb_project: str = "",
     wandb_run_name: str = "",
     wandb_watch: str = "",  # options: false | gradients | all
     wandb_log_model: str = "",  # options: false | true
@@ -102,11 +102,14 @@ def train(
 
     device_map = "auto"
     world_size = int(os.environ.get("WORLD_SIZE", 1))
-    ddp = world_size != 1
-    if ddp:
-        print(">>>>>>>>>> Using DDP")
-        device_map = {"": int(os.environ.get("LOCAL_RANK") or 0)}
-        gradient_accumulation_steps = gradient_accumulation_steps // world_size
+    num_gpus = torch.cuda.device_count()
+    print(">>>>>>>>>> Number of GPUs available:", num_gpus)
+    # ddp = world_size != 1
+    # if ddp:
+    #     device_map = {"": int(os.environ.get("LOCAL_RANK") or 0)}
+    #     gradient_accumulation_steps = gradient_accumulation_steps // world_size
+    #     print(">>>>>>>>>> Using DDP")
+    #     print(f">>>>>>>>>> {device_map}")
 
     # Check if parameter passed or if set within environ
     use_wandb = len(wandb_project) > 0 or (
@@ -241,7 +244,8 @@ def train(
         train_data = data["train"].shuffle().map(generate_and_tokenize_prompt)
         val_data = None
 
-    if not ddp and torch.cuda.device_count() > 1:
+    # if not ddp and torch.cuda.device_count() > 1:
+    if torch.cuda.device_count() > 1:
         # keeps Trainer from trying its own DataParallelism when more than 1 gpu is available
         model.is_parallelizable = True
         model.model_parallel = True
@@ -281,7 +285,8 @@ def train(
             output_dir=output_dir,
             save_total_limit=5,
             load_best_model_at_end=True if val_set_size > 0 else False,
-            ddp_find_unused_parameters=False if ddp else None,
+            # ddp_find_unused_parameters=False if ddp else None,
+            ddp_find_unused_parameters= None,
             group_by_length=group_by_length,
             report_to="wandb" if use_wandb else None,
             run_name=wandb_run_name if use_wandb else None,
@@ -305,9 +310,43 @@ def train(
     )
 
 
-
-
-
-
 if __name__ == "__main__":
     fire.Fire(train)
+
+
+# if __name__ == "__main__":
+#     parser = argparse.ArgumentParser(description="Training configuration")
+    
+#     # Model/data parameters
+#     parser.add_argument('--base_model', type=str, default="", help='Base model to use')
+#     parser.add_argument('--data_path', type=str, default="", help='Path to data')
+#     parser.add_argument('--output_dir', type=str, default="", help='Output directory for the model')
+    
+#     # Training hyperparameters
+#     parser.add_argument('--batch_size', type=int, default=128, help='Batch size for training')
+#     parser.add_argument('--micro_batch_size', type=int, default=8, help='Micro batch size for training')
+#     parser.add_argument('--num_epochs', type=int, default=10, help='Number of epochs')
+#     parser.add_argument('--learning_rate', type=float, default=3e-4, help='Learning rate')
+#     parser.add_argument('--cutoff_len', type=int, default=256, help='Cutoff length')
+#     parser.add_argument('--val_set_size', type=int, default=500, help='Validation set size')
+
+#     # LoRA hyperparameters
+#     parser.add_argument('--lora_r', type=int, default=8, help='LoRA rank')
+#     parser.add_argument('--lora_alpha', type=int, default=16, help='LoRA alpha')
+#     parser.add_argument('--lora_dropout', type=float, default=0.05, help='LoRA dropout')
+#     parser.add_argument('--lora_target_modules', nargs='*', default=["query_key_value"], help='LoRA target modules')
+    
+#     # LLM hyperparameters
+#     parser.add_argument('--train_on_inputs', type=bool, default=False, help='Whether to train on inputs')
+#     parser.add_argument('--group_by_length', type=bool, default=False, help='Whether to group by length for training')
+
+#     # WandB parameters
+#     parser.add_argument('--wandb_project', type=str, default="llama_med", help='Weights & Biases project name')
+#     parser.add_argument('--wandb_run_name', type=str, default="", help='Weights & Biases run name')
+#     parser.add_argument('--wandb_watch', type=str, default='false', choices=['false', 'gradients', 'all'], help='WandB watch option')
+#     parser.add_argument('--wandb_log_model', type=str, default='false', choices=['false', 'true'], help='Whether to log model to WandB')
+#     parser.add_argument('--resume_from_checkpoint', type=str, default=None, help='Path to resume from a checkpoint')
+#     parser.add_argument('--prompt_template_name', type=str, default="alpaca", help='Prompt template name')
+
+#     args = parser.parse_args()
+#     train(args)
