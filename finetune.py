@@ -7,6 +7,9 @@ import wandb
 import torch
 import transformers
 from datasets import load_dataset
+import socket
+
+
 
 """
 Unused imports:
@@ -18,22 +21,22 @@ from peft import (
     LoraConfig,
     get_peft_model,
     get_peft_model_state_dict,
-    prepare_model_for_int8_training,
+    prepare_model_for_kbit_training,
     set_peft_model_state_dict,
 )
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 from utils.prompter import Prompter
 
-from transformers import Seq2SeqTrainer, TrainerCallback, TrainingArguments, TrainerState, TrainerControl
+from transformers import Seq2SeqTrainer, TrainerCallback, TrainingArguments, TrainerState, TrainerControl, BitsAndBytesConfig
 from transformers.trainer_utils import PREFIX_CHECKPOINT_DIR
 
 
 def train(
     # model/data params
-    base_model: str = "",  # the only required argument
-    data_path: str = "yahma/alpaca-cleaned",
-    output_dir: str = "./lora-alpaca",
+    base_model: str = "", 
+    data_path: str = "",
+    output_dir: str = "",
     # training hyperparams
     batch_size: int = 128,
     micro_batch_size: int = 8,
@@ -45,10 +48,14 @@ def train(
     lora_r: int = 8,
     lora_alpha: int = 16,
     lora_dropout: float = 0.05,
+    # lora_target_modules: List[str] = [
+    #     "q_proj",
+    #     "v_proj",
+    # ],
     lora_target_modules: List[str] = [
-        "q_proj",
-        "v_proj",
+        "query_key_value",
     ],
+
     # llm hyperparams
     train_on_inputs: bool = False,  # if False, masks out inputs in loss
     group_by_length: bool = False,  # faster, but produces an odd training loss curve
@@ -84,6 +91,7 @@ def train(
             f"wandb_log_model: {wandb_log_model}\n"
             f"resume_from_checkpoint: {resume_from_checkpoint or False}\n"
             f"prompt template: {prompt_template_name}\n"
+            # f">>>>>>>>>{socket.gethostname()}"
         )
     assert (
         base_model
@@ -96,6 +104,7 @@ def train(
     world_size = int(os.environ.get("WORLD_SIZE", 1))
     ddp = world_size != 1
     if ddp:
+        print(">>>>>>>>>> Using DDP")
         device_map = {"": int(os.environ.get("LOCAL_RANK") or 0)}
         gradient_accumulation_steps = gradient_accumulation_steps // world_size
 
@@ -111,9 +120,20 @@ def train(
     if len(wandb_log_model) > 0:
         os.environ["WANDB_LOG_MODEL"] = wandb_log_model
 
+    # model = AutoModelForCausalLM.from_pretrained(
+    #     base_model,
+    #     load_in_8bit=True,
+    #     torch_dtype=torch.float16,
+    #     device_map=device_map,
+    # )
+    
+    # Define the quantization configuration using BitsAndBytesConfig
+    quantization_config = BitsAndBytesConfig(load_in_8bit=True)
+
+    # Create the model using the new configuration approach
     model = AutoModelForCausalLM.from_pretrained(
         base_model,
-        load_in_8bit=True,
+        quantization_config=quantization_config,
         torch_dtype=torch.float16,
         device_map=device_map,
     )
@@ -168,7 +188,7 @@ def train(
             ]  # could be sped up, probably
         return tokenized_full_prompt
 
-    model = prepare_model_for_int8_training(model)
+    model = prepare_model_for_kbit_training(model)
 
     config = LoraConfig(
         r=lora_r,
