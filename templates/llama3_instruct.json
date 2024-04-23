@@ -1,0 +1,8 @@
+{
+    "description": "Template used by Med Instruction Tuning",
+    "prompt_input": "<|begin_of_text|>\n<|start_header_id|>system<|end_header_id|>\n下面是一个问题，运用医学知识来正确回答提问.<|eot_id|>\n<|start_header_id|>user<|end_header_id|>\n{instruction}<|eot_id|>\n<|start_header_id|>assistant<|end_header_id|>",
+    "prompt_no_input": "<|begin_of_text|>\n<|start_header_id|>system<|end_header_id|>\n下面是一个问题，运用医学知识来正确回答提问.<|eot_id|>\n<|start_header_id|>user<|end_header_id|>\n{instruction}<|eot_id|>\n<|start_header_id|>assistant<|end_header_id|>",
+    "response_split": "<|start_header_id|>assistant<|end_header_id|>"
+}
+
+

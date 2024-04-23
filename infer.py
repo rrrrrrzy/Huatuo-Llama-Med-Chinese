@@ -67,7 +67,7 @@ def main(
         top_p=0.75,
         top_k=40,
         num_beams=4,
-        max_new_tokens=256,
+        max_new_tokens=512,
         **kwargs,
     ):
         prompt = prompter.generate_prompt(instruction, input)
@@ -78,6 +78,7 @@ def main(
             top_p=top_p,
             top_k=top_k,
             num_beams=num_beams,
+            do_sample=True,
             **kwargs,
         )
         with torch.no_grad():
@@ -94,17 +95,28 @@ def main(
 
     def infer_from_json(instruct_dir):
         input_data = load_instruction(instruct_dir)
-        for d in input_data:
-            instruction = d["instruction"]
-            output = d["output"]
-            print("###infering###")
-            model_output = evaluate(instruction)
-            print("###instruction###")
-            print(instruction)
-            print("###golden output###")
-            print(output)
-            print("###model output###")
-            print(model_output)
+        # for d in input_data:
+        #     instruction = d["instruction"]
+        #     output = d["output"]
+        #     print("###infering###")
+        #     model_output = evaluate(instruction)
+        #     print("###instruction###")
+        #     print(instruction)
+        #     # print("###golden output###")
+        #     # print(output)
+        #     print("###model output###")
+        #     print(model_output)
+        with open(f'./output/huozi_r16.txt', 'w') as file:
+            for d in input_data:
+                instruction = d["instruction"]
+                model_output = evaluate(instruction)
+                file.write("###instruction###\n")
+                file.write(instruction + "\n")
+                # file.write("###golden output###\n")
+                # file.write(output + "\n")
+                file.write("###model output###\n")
+                file.write(model_output + "\n")
+
 
     if instruct_dir != "":
         infer_from_json(instruct_dir)

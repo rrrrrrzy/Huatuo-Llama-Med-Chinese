@@ -48,13 +48,13 @@ def train(
     lora_r: int = 8,
     lora_alpha: int = 16,
     lora_dropout: float = 0.05,
-    # lora_target_modules: List[str] = [
-    #     "q_proj",
-    #     "v_proj",
-    # ],
     lora_target_modules: List[str] = [
-        "query_key_value",
+        "q_proj",
+        "v_proj",
     ],
+    # lora_target_modules: List[str] = [
+    #     "query_key_value",
+    # ],
 
     # llm hyperparams
     train_on_inputs: bool = False,  # if False, masks out inputs in loss
@@ -140,7 +140,7 @@ def train(
         torch_dtype=torch.float16,
         device_map=device_map,
     )
-
+    # print(model)
     tokenizer = AutoTokenizer.from_pretrained(base_model)
 
     tokenizer.pad_token_id = (
